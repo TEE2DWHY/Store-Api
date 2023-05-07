@@ -18,7 +18,7 @@ const getProduct = asyncWrapper(async (req, res) => {
     queryObject.company = company;
   }
   if (name) {
-    queryObject.name = name;
+    queryObject.name = { $regex: name, $options: "i" };
   }
 
   const product = await Product.find(queryObject);
