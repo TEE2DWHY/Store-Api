@@ -3,13 +3,14 @@ const asyncWrapper = require("../middleware/async");
 
 // get all products
 const getAllProducts = asyncWrapper(async (req, res) => {
-  const products = await Product.find();
+  const products = await Product.find({ rating: { $lt: 4.5 } });
   res.status(200).json({ products, nbHits: products.length });
 });
 
 // get specific products
 const getProduct = asyncWrapper(async (req, res) => {
-  const { featured, company, name, sort, price, fields } = req.query;
+  const { featured, company, name, sort, price, fields, numericField } =
+    req.query;
   const queryObject = {};
   if (featured) {
     queryObject.featured = featured === "true" ? true : false;
@@ -22,6 +23,29 @@ const getProduct = asyncWrapper(async (req, res) => {
   }
   if (price) {
     queryObject.price = price;
+  }
+  //numeric filters handler
+  if (numericField) {
+    const operatorMap = {
+      ">": "$gt",
+      ">=": "$gte",
+      "=": "$eq",
+      "<": "$lt",
+      "<=": "$lte",
+    };
+    const regEx = /\b(<|>|>=|=|<|<=)\b/g;
+    let filters = numericField.replace(
+      regEx,
+      (match) => `-${operatorMap[match]}-`
+    );
+    const options = ["price", "rating"];
+    filters = filters.split(",").forEach((item) => {
+      const [field, operator, value] = item.split("-");
+      if (options.includes(field)) {
+        queryObject[field] = { [operator]: Number(value) };
+      }
+    });
+    console.log(queryObject);
   }
   let result = Product.find(queryObject);
   //sort
@@ -36,6 +60,7 @@ const getProduct = asyncWrapper(async (req, res) => {
     const fieldList = fields.split(",").join(" ");
     result = result.select(fieldList);
   }
+
   //pagination
   const page = Number(req.query.page) || 1;
   const limit = Number(req.query.limit) || 10;
